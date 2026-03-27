@@ -1,1 +1,220 @@
-# -
+# -<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>마인크래프트 도시 서버 - 도로명 주소 부여 툴</title>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
+        .wrap { max-width: 1000px; margin: 0 auto; display: flex; gap: 20px; flex-wrap: wrap; }
+        .panel { background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); flex: 1; min-width: 300px; }
+        h1 { font-size: 1.5rem; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; margin-top: 0; }
+        h2 { font-size: 1.2rem; margin-bottom: 10px; color: #2c3e50; }
+        label { font-weight: bold; display: block; margin-top: 15px; margin-bottom: 5px; }
+        .hint { font-size: 0.85rem; color: #7f8c8d; margin-bottom: 10px; display: block; }
+        textarea, input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-family: monospace; }
+        textarea { height: 150px; resize: vertical; }
+        .input-group { display: flex; gap: 10px; }
+        button { margin-top: 20px; width: 100%; padding: 15px; background-color: #27ae60; color: white; border: none; border-radius: 6px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        button:hover { background-color: #219150; }
+        #resultArea { margin-top: 25px; padding: 20px; background-color: #e8f6f3; border-left: 5px solid #27ae60; border-radius: 6px; display: none; line-height: 1.6; }
+        .address-highlight { font-size: 1.5rem; font-weight: bold; color: #c0392b; }
+        canvas { background-color: #fafafa; border: 1px solid #eee; border-radius: 6px; width: 100%; max-height: 400px; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="wrap">
+    <div class="panel">
+        <h1>도로명 주소 계산기</h1>
+        
+        <label>1. 도로 웨이포인트 (진행 방향 순서대로)</label>
+        <span class="hint">도로의 꺾이는 지점 좌표 (X, Z)를 줄바꿈으로 구분하여 입력하세요.</span>
+        <textarea id="roadInput">
+0, 0
+50, 0
+70, 40
+40, 90</textarea>
+
+        <label>2. 건물 입구 좌표</label>
+        <span class="hint">주소를 부여할 건물의 X, Z 좌표를 입력하세요.</span>
+        <div class="input-group">
+            <input type="number" id="bX" placeholder="건물 X" value="65">
+            <input type="number" id="bZ" placeholder="건물 Z" value="30">
+        </div>
+
+        <button onclick="calculate()">주소 자동 부여하기</button>
+
+        <div id="resultArea"></div>
+    </div>
+
+    <div class="panel">
+        <h2>지도 시각화</h2>
+        <span class="hint">파란 선: 도로 / 빨간 점: 건물 / 녹색 점: 수선의 발(가장 가까운 도로)</span>
+        <canvas id="mapCanvas" width="500" height="500"></canvas>
+    </div>
+</div>
+
+<script>
+    function calculate() {
+        // 1. 도로 데이터 파싱
+        const rawLines = document.getElementById('roadInput').value.trim().split('\n');
+        const road = [];
+        for (let line of rawLines) {
+            const parts = line.split(',');
+            if (parts.length >= 2) {
+                road.push({ x: parseFloat(parts[0].trim()), z: parseFloat(parts[1].trim()) });
+            }
+        }
+
+        const bX = parseFloat(document.getElementById('bX').value);
+        const bZ = parseFloat(document.getElementById('bZ').value);
+
+        if (road.length < 2 || isNaN(bX) || isNaN(bZ)) {
+            alert("도로 웨이포인트를 2개 이상 정확히 입력하고, 건물 좌표를 확인해주세요.");
+            return;
+        }
+
+        let minDistance = Infinity;
+        let bestSegment = null;
+        let distanceUpToSegment = 0;
+        let currentRoadLength = 0;
+
+        // 2. 가장 가까운 선분 찾기 로직
+        for (let i = 0; i < road.length - 1; i++) {
+            const A = road[i];
+            const B = road[i + 1];
+
+            const ABx = B.x - A.x;
+            const ABz = B.z - A.z;
+            const APx = bX - A.x;
+            const APz = bZ - A.z;
+
+            const segmentLengthSq = ABx * ABx + ABz * ABz;
+            const segmentLength = Math.sqrt(segmentLengthSq);
+
+            // 투영 비율 t (0 ~ 1 사이로 제한하여 선분 밖으로 벗어나지 않게 함)
+            let t = 0;
+            if (segmentLengthSq > 0) {
+                t = (APx * ABx + APz * ABz) / segmentLengthSq;
+                t = Math.max(0, Math.min(1, t));
+            }
+
+            // 가장 가까운 도로 위 지점 (수선의 발)
+            const projX = A.x + t * ABx;
+            const projZ = A.z + t * ABz;
+
+            // 건물과 수선의 발 사이의 거리
+            const distToSegment = Math.sqrt(Math.pow(bX - projX, 2) + Math.pow(bZ - projZ, 2));
+
+            // 최단 거리 갱신
+            if (distToSegment < minDistance) {
+                minDistance = distToSegment;
+                bestSegment = {
+                    index: i,
+                    A: A, B: B,
+                    projX: projX, projZ: projZ,
+                    distBefore: currentRoadLength, // 이전 선분들까지의 길이 합
+                    distOnSegment: t * segmentLength // 현재 선분 내에서의 이동 거리
+                };
+            }
+            currentRoadLength += segmentLength;
+        }
+
+        // 3. 방향 판별 (벡터의 외적) 및 주소 계산
+        // 진행방향 벡터(AB)와 건물방향 벡터(AP)의 외적
+        const crossProduct = (bestSegment.B.x - bestSegment.A.x) * (bZ - bestSegment.A.z) - 
+                             (bestSegment.B.z - bestSegment.A.z) * (bX - bestSegment.A.x);
+        
+        const isLeft = crossProduct > 0;
+        const sideText = isLeft ? "왼쪽 (홀수)" : "오른쪽 (짝수)";
+
+        // 총 도로 진행 거리 (10블록당 번호 1 증가)
+        const totalDistance = bestSegment.distBefore + bestSegment.distOnSegment;
+        
+        let baseNumber = Math.floor(totalDistance / 10) * 2;
+        if (baseNumber === 0) baseNumber = 2; // 번호는 최소 1 또는 2부터 시작
+        
+        const addressNumber = isLeft ? baseNumber - 1 : baseNumber;
+
+        // 4. 결과 출력
+        const resultArea = document.getElementById('resultArea');
+        resultArea.style.display = 'block';
+        resultArea.innerHTML = `
+            <div>✅ <strong>${bestSegment.index + 1}번째 도로 구간</strong>에 가장 인접해 있습니다.</div>
+            <div>✅ 건물은 도로 진행 방향의 <strong>${sideText}</strong>에 위치합니다.</div>
+            <div>✅ 도로 시작점으로부터의 투영 거리: <strong>${totalDistance.toFixed(1)} 블록(m)</strong></div>
+            <hr style="border:0; border-top:1px dashed #27ae60; margin: 15px 0;">
+            <div>부여된 건물 번호: <span class="address-highlight">${addressNumber}</span></div>
+        `;
+
+        // 5. Canvas 그리기
+        drawCanvas(road, bX, bZ, bestSegment);
+    }
+
+    function drawCanvas(road, bX, bZ, best) {
+        const canvas = document.getElementById('mapCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 스케일 및 여백 계산
+        let minX = bX, maxX = bX, minZ = bZ, maxZ = bZ;
+        road.forEach(p => {
+            if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+            if (p.z < minZ) minZ = p.z; if (p.z > maxZ) maxZ = p.z;
+        });
+
+        const padding = 50;
+        const rangeX = maxX - minX || 1;
+        const rangeZ = maxZ - minZ || 1;
+        const scale = Math.min((canvas.width - padding * 2) / rangeX, (canvas.height - padding * 2) / rangeZ);
+
+        const getP = (x, z) => ({
+            x: padding + (x - minX) * scale,
+            y: canvas.height - (padding + (z - minZ) * scale) // Z축 반전 (마인크래프트 지도 느낌)
+        });
+
+        // 도로 그리기
+        ctx.beginPath();
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = '#3498db';
+        ctx.lineJoin = 'round';
+        for (let i = 0; i < road.length; i++) {
+            const p = getP(road[i].x, road[i].z);
+            if (i === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
+
+        // 수선의 발(가장 가까운 지점) 연결선
+        const projP = getP(best.projX, best.projZ);
+        const bP = getP(bX, bZ);
+        
+        ctx.beginPath();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#27ae60';
+        ctx.setLineDash([5, 5]);
+        ctx.moveTo(bP.x, bP.y);
+        ctx.lineTo(projP.x, projP.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 도로 웨이포인트 마커
+        ctx.fillStyle = '#2c3e50';
+        road.forEach(pt => {
+            const p = getP(pt.x, pt.z);
+            ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
+        });
+
+        // 수선의 발 마커
+        ctx.fillStyle = '#27ae60';
+        ctx.beginPath(); ctx.arc(projP.x, projP.y, 6, 0, Math.PI * 2); ctx.fill();
+
+        // 건물 마커
+        ctx.fillStyle = '#e74c3c';
+        ctx.beginPath(); ctx.arc(bP.x, bP.y, 8, 0, Math.PI * 2); ctx.fill();
+    }
+</script>
+
+</body>
+</html>
