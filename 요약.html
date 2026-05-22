@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI 필기 요약 앱</title>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      background: #f3f4f6;
+      padding: 30px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: auto;
+      background: white;
+      border-radius: 24px;
+      padding: 40px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      font-size: 42px;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      color: gray;
+      margin-bottom: 40px;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+    }
+
+    .card {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 20px;
+      padding: 25px;
+    }
+
+    .card h2 {
+      margin-bottom: 20px;
+      font-size: 28px;
+    }
+
+    .upload-box {
+      border: 2px dashed #cbd5e1;
+      border-radius: 20px;
+      height: 300px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      background: white;
+    }
+
+    .upload-box:hover {
+      background: #f1f5f9;
+    }
+
+    .upload-box input {
+      display: none;
+    }
+
+    .upload-icon {
+      font-size: 70px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 20px;
+      padding: 15px;
+      border: none;
+      border-radius: 16px;
+      background: black;
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .result-box {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 20px;
+      min-height: 180px;
+      line-height: 1.7;
+      white-space: pre-line;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-top: 40px;
+    }
+
+    .feature {
+      padding: 25px;
+      border-radius: 20px;
+      border: 1px solid #ddd;
+    }
+
+    .feature-icon {
+      font-size: 40px;
+      margin-bottom: 10px;
+    }
+
+    .blue {
+      background: #eff6ff;
+    }
+
+    .green {
+      background: #ecfdf5;
+    }
+
+    .yellow {
+      background: #fef9c3;
+    }
+
+    @media (max-width: 900px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>AI 필기 요약 앱</h1>
+    <p class="subtitle">
+      필기 사진을 업로드하면 AI가 자동으로 요약하고 예상 문제를 생성합니다.
+    </p>
+
+    <div class="main-grid">
+
+      <div class="card">
+        <h2>1. 필기 업로드</h2>
+
+        <label class="upload-box">
+          <input type="file" accept="image/*">
+          <div class="upload-icon">📄</div>
+          <p><strong>필기 사진 업로드</strong></p>
+          <p>PNG, JPG 파일 지원</p>
+        </label>
+
+        <button onclick="analyzeNote()">AI 분석 시작</button>
+      </div>
+
+      <div>
+
+        <div class="card">
+          <h2>2. AI 요약</h2>
+
+          <div class="result-box" id="summaryBox">
+업로드한 필기의 핵심 내용이 여기에 표시됩니다.
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:20px;">
+          <h2>3. 예상 문제 생성</h2>
+
+          <div class="result-box" id="questionBox">
+예상 시험 문제가 여기에 표시됩니다.
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <div class="feature-grid">
+
+      <div class="feature blue">
+        <div class="feature-icon">🧠</div>
+        <h3>핵심 개념 추출</h3>
+        <p>중요한 내용을 자동으로 정리합니다.</p>
+      </div>
+
+      <div class="feature green">
+        <div class="feature-icon">❓</div>
+        <h3>예상 문제 생성</h3>
+        <p>시험 대비 문제를 자동 생성합니다.</p>
+      </div>
+
+      <div class="feature yellow">
+        <div class="feature-icon">📚</div>
+        <h3>빠른 복습</h3>
+        <p>긴 필기를 짧게 요약해 공부 효율을 높입니다.</p>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    function analyzeNote() {
+      document.getElementById('summaryBox').innerText =
+`• 광합성은 식물이 빛 에너지를 이용해 포도당을 만드는 과정이다.
+• 엽록체에서 일어나며 산소가 생성된다.
+• 광합성의 결과물은 포도당과 산소이다.`;
+
+      document.getElementById('questionBox').innerText =
+`1. 광합성이 일어나는 세포 소기관은?
+2. 광합성의 결과물 두 가지는?
+3. 식물이 광합성에 사용하는 에너지는?`;
+    }
+  </script>
+
+</body>
+</html>
